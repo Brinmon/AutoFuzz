@@ -1,0 +1,10 @@
+{
+    "project_id":"8",                       
+    "program_name": "LibTIFF",                
+    "UpladFile": "", 
+    "Urls":"https://github.com/fuzzstati0n/fuzzgoat.git",       
+    "version":"fuzzgoat_v1.0",
+    "fuzz_time": "40",              
+    "parallel": 1  ,    
+    "bin_cmd": "fuzzgoat @@"
+}
