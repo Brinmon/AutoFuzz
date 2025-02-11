@@ -1,14 +1,10 @@
-import json
-import os
+from RunFuzzTool import *
 
 #读取json文件
 def read_config(file_path):
     """读取JSON配置文件并返回内容"""
     with open(file_path, 'r') as f:
         return json.load(f)
-
-import os
-import json
 
 def initialize_fuzz_config(current_directory):
     """
@@ -63,7 +59,7 @@ def initialize_pv_manager(fuzz_config_path):
     with open(fuzz_config_path, 'r') as f:
         fuzz_config = json.load(f)
     
-    pv_manager_path = os.path.join(fuzz_config["ProjectionVerionManager"], "PVManger.json")
+    pv_manager_path = os.path.join(fuzz_config["ProjectionVerionManager"], "PVManager.json")
     
     # 如果 PVManger.json 文件不存在，则创建并初始化
     if not os.path.exists(pv_manager_path):
@@ -76,7 +72,34 @@ def initialize_pv_manager(fuzz_config_path):
             json.dump(pv_manager, f, indent=4)
 
 
+def copy_files_to_current_task(release_file_path, current_task_path):
+    """
+    复制 release_file_path 中的所有文件和文件夹到 current_task_path。
+    """
+    # 确保目标路径存在，如果不存在则创建
+    os.makedirs(current_task_path, exist_ok=True)
 
+    # 遍历 ReleaseFilePath 文件夹中的所有文件和文件夹
+    for item in os.listdir(release_file_path):
+        source_path = os.path.join(release_file_path, item)
+        destination_path = os.path.join(current_task_path, item)
+
+        if os.path.isfile(source_path):
+            # 如果是文件，进行文件复制
+            try:
+                shutil.copy(source_path, destination_path)
+                print(f"Copied file {source_path} to {destination_path}")
+            except Exception as e:
+                print(f"Error copying file {source_path} to {destination_path}: {e}")
+        elif os.path.isdir(source_path):
+            # 如果是文件夹，进行目录复制
+            try:
+                shutil.copytree(source_path, destination_path, dirs_exist_ok=True)  # Python 3.8+ 支持 dirs_exist_ok 参数
+                print(f"Copied directory {source_path} to {destination_path}")
+            except Exception as e:
+                print(f"Error copying directory {source_path} to {destination_path}: {e}")
+        else:
+            print(f"Skipping {source_path}, it's neither a file nor a directory.")
 
 
 
