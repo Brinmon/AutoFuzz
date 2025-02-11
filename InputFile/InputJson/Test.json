@@ -1,6 +1,6 @@
 {
-    "project_id":"8",                       
-    "program_name": "LibTIFF",                
+    "project_id":"1",                       
+    "program_name": "FuzzGoat_v1.0",                
     "UpladFile": "", 
     "Urls":"https://github.com/fuzzstati0n/fuzzgoat.git",       
     "version":"fuzzgoat_1.0",

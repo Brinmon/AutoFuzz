@@ -35,15 +35,46 @@ def AutoFuzzMain(FuzzTaskInfo):
         #将目标文件夹的数据都复制到目标文件夹
         versioncontext = FuzzTaskInfo["version"]
         ReleaseFilePath = Path(get_projection_version_manager()).joinpath(f"{versioncontext}")
-        print(ReleaseFilePath)
         copy_files_to_current_task(ReleaseFilePath,CurrentTaskPath)
 
     # 创建 Docker 客户端
-    # Mainclient = docker.from_env()
-    # bind_mount = {f'{CurrentTaskPath}': '/tmp'}
-    # dockername = f"{FuzzTaskName}_{ProjectID}"  #避免测试同一个项目时候发生冲突
-    # Currentcontainer = CreateAFLDocker(Mainclient,dockername,bind_mount,use_existing=True)
+    Mainclient = docker.from_env()
+    bind_mount = {f'{CurrentTaskPath}': '/tmp'}
+    dockername = f"{FuzzTaskName}_{ProjectID}"  #避免测试同一个项目时候发生冲突
+    Currentcontainer = CreateAFLDocker(Mainclient,dockername,bind_mount,use_existing=True)
 
+
+    print(f"为docker内的容器设置默认初始化环境！")
+    init_commands = [
+        'chmod -R 777 /tmp',
+        'cd /tmp && ls',
+        # "rm -f /tmp/dockerinfo.txt",  # 删除文件
+        # "touch /tmp/dockerinfo.txt",  # 重新创建文件
+        # "chmod 666 /tmp/dockerinfo.txt",  # 设置文件权限
+        "echo 'test'"
+    ]
+
+    execute_commands_in_container(Currentcontainer,init_commands,CurrentTaskPath)
+    print("查看生成的命令和信息:",init_commands)
+
+    #我需要在一个目录中寻找指定文件名的可执行文件
+    targetbinname = binary_cmd.split()[0]
+    hosttargetbinpath = find_executable_in_directory(CurrentTaskPath,targetbinname)
+    dokcertargetbinpath = convert_host_to_docker_path(hosttargetbinpath,bind_mount)
+    newbinary_cmd = f"{dokcertargetbinpath} {binary_cmd[len(targetbinname):]}"
+
+
+    aflseed = 123
+
+    #执行命令
+    # 创建命令列表
+    commands_run = [
+        "echo '开始测试目标程序是否可以运行'",
+        f"file {dokcertargetbinpath}",
+        f"chmod 777 {dokcertargetbinpath}",
+        f"cd /tmp && AFL_MAP_SIZE=10000000 afl-fuzz -i ./input -o ./out -s {aflseed} -- {newbinary_cmd}" # 构建命令
+    ]
+    execute_commands_in_container(Currentcontainer,commands_run,CurrentTaskPath,RUNCMDtimeout=int(fuzz_time))
 
 
 

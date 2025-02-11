@@ -1,0 +1,10 @@
+{
+    "project_id":"3",                       
+    "program_name": "Xpdf_v4.05",                
+    "UpladFile": "", 
+    "Urls":"",       
+    "version":"xpdf_4.05",
+    "fuzz_time": "40",              
+    "parallel": 1  ,    
+    "bin_cmd": "pdftotext @@ ./output.txt"
+}
