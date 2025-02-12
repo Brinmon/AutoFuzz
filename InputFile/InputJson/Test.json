@@ -4,7 +4,7 @@
     "UpladFile": "", 
     "Urls":"https://github.com/fuzzstati0n/fuzzgoat.git",       
     "version":"fuzzgoat_1.0",
-    "fuzz_time": "40",              
+    "fuzz_time": "70",              
     "parallel": 1  ,    
     "bin_cmd": "fuzzgoat @@"
 }

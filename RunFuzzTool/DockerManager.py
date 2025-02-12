@@ -99,29 +99,126 @@ def execute_commands_in_container(container, commands, CurrentWorkDir, log_file=
         if thread.is_alive():
             print(f"命令执行超时: {command}，已终止。")
             # 终止容器中的命令
-            container.exec_run("bash -c 'killall -9 -1'", detach=True)
+            container.exec_run("bash -c 'killall -9 bash'", detach=True) #该命令并未终止afl的模糊测试进程
             continue  # 跳过当前命令，继续执行下一个命令
 
         # 检查命令的退出状态码
         if exit_code_Current != 0:
             print(f"命令执行失败: {command}")
+            print("状态码的值:",exit_code_Current)
             # 读取日志文件
             with open(host_log_file, 'r') as f:
                 lines = f.readlines()
                 # 如果日志文件行数大于 20，读取最后 20 行；否则读取全部行
                 last_lines = ''.join(lines[-20:]) if len(lines) > 20 else ''.join(lines)
-
             print(f"日志文件最后 20 行内容:\n{last_lines}")
+            return False
         else:
             print(f"命令执行成功: {command}")
     print("所有命令已执行完成。")
+    return True
 
-def convert_host_to_docker_path(host_path, bind_mount):
-    # 遍历 bind_mount，找到宿主机路径的映射关系
-    for host_dir, docker_dir in bind_mount.items():
-        if host_path.startswith(host_dir):  # 检查宿主机路径是否在映射路径下
-            # 获取宿主机路径相对于绑定路径的部分，并替换为容器内的路径
-            docker_path = host_path.replace(host_dir, docker_dir, 1)
-            return docker_path
-    # 如果没有找到映射关系，返回原路径
-    return host_path
+
+
+def check_and_stop_container(client,container_name):
+    """
+    检测容器是否存在，如果存在则停止容器
+    :param container_name: 容器名称或 ID
+    """
+
+    try:
+        # 获取容器对象
+        container = client.containers.get(container_name)
+        print(f"容器 {container_name} 存在，正在停止...")
+        
+        # 停止容器
+        container.stop()
+        print(f"容器 {container_name} 已停止。")
+    except docker.errors.NotFound:
+        print(f"容器 {container_name} 不存在。")
+    except Exception as e:
+        print(f"检测或停止容器时出错: {e}")
+
+
+def BuildTargetProjectInDocker(container, CurrentWorkDir):
+    print(f"完整的编译目标项目")
+    build_commands = [
+        "rm -rf /tmp/out",  # 删除初始化文件夹
+        "rm -f /tmp/dockerinfo.txt",  # 删除文件
+        "touch /tmp/dockerinfo.txt",  # 重新创建文件
+        'chmod -R 777 /tmp',
+        "echo '开始构建fuzz目标'",
+        "cd /tmp && bash ./Build.sh",  # 构建命令
+        "echo '构建和启动完成'"
+    ]
+
+    buildresult = execute_commands_in_container(container,build_commands,CurrentWorkDir)
+    return buildresult
+
+def DockerRunAFL(dokcertargetbinpath,newbinary_cmd,Currentcontainer,CurrentTaskPath,fuzz_time):
+    aflseed = 123
+
+    #执行命令
+    # 创建命令列表
+    commands_run = [
+        "echo '开始测试目标程序是否可以运行'",
+        f"chmod 777 {dokcertargetbinpath}",
+        f"cd /tmp && AFL_MAP_SIZE=10000000 afl-fuzz -i ./input -o ./out -s {aflseed} -- {newbinary_cmd}", # 构建命令
+        "chmod -R 777 /tmp/out"  #由于运行后共享文件夹内并未将docker内的文件共享出来所以多赋予权限
+    ]
+    fuzzresult = execute_commands_in_container(Currentcontainer,commands_run,CurrentTaskPath,RUNCMDtimeout=int(fuzz_time))
+    return fuzzresult
+
+
+def ExecuteCmdInDocker(container, command):
+    """在 Docker 容器中执行命令并返回执行结果"""
+    exit_code_current = None
+    output_current = None
+    exec_command = f"bash -c '{command}'"
+    exit_code_current, output_current = container.exec_run(exec_command, detach=False, stdout=True, stderr=True)
+
+    if exit_code_current == 0:
+        return {"status": "success", "output": output_current.decode("utf-8")}
+    else:
+        return {"status": "error", "output": output_current.decode("utf-8"), "exit_code": exit_code_current}
+
+def parse_summary_stats(text):
+    """解析命令输出中的 Summary stats 并返回 JSON 格式"""
+    summary_start = text.find("Summary stats")
+    if summary_start == -1:
+        return None
+    
+    summary_text = text[summary_start:].split("=============")[1].strip()
+    
+    data = {}
+    for line in summary_text.split('\n'):
+        line = line.strip()
+        if line and ':' in line:
+            key, value = line.split(':', 1)
+            key = key.strip()
+            value = value.strip()
+            data[key] = value
+
+    # 判断是否所有重要字段为空或为 0
+    if (data.get("Fuzzers alive", "0") == "0" and
+        data.get("Total run time", "0") == "0 seconds" and
+        data.get("Total execs", "0 thousands") == "0 thousands" and
+        data.get("Cumulative speed", "0 execs/sec") == "0 execs/sec" and
+        data.get("Pending items", "0 faves, 0 total") == "0 faves, 0 total" and
+        data.get("Crashes saved", "0") == "0" and
+        data.get("Hangs saved", "0") == "0"):
+        return None  # 返回 None 表示没有有效数据，不需要更新文件
+    
+    return data
+
+def save_status_to_file(status_data, directory):
+    """将命令执行结果以 JSON 格式保存到指定目录的文件"""
+    # 确保目录存在
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+
+    # 定义文件路径
+    file_path = os.path.join(directory, "FuzzStatus.json")
+
+    with open(file_path, "w") as f:
+        json.dump(status_data, f, indent=4)

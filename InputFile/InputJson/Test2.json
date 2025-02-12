@@ -4,7 +4,7 @@
     "UpladFile": "", 
     "Urls":"",       
     "version":"xpdf_4.05",
-    "fuzz_time": "40",              
+    "fuzz_time": "60",              
     "parallel": 1  ,    
     "bin_cmd": "pdftotext @@ ./output.txt"
 }

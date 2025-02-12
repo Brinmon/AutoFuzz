@@ -72,34 +72,6 @@ def initialize_pv_manager(fuzz_config_path):
             json.dump(pv_manager, f, indent=4)
 
 
-def copy_files_to_current_task(release_file_path, current_task_path):
-    """
-    复制 release_file_path 中的所有文件和文件夹到 current_task_path。
-    """
-    # 确保目标路径存在，如果不存在则创建
-    os.makedirs(current_task_path, exist_ok=True)
-
-    # 遍历 ReleaseFilePath 文件夹中的所有文件和文件夹
-    for item in os.listdir(release_file_path):
-        source_path = os.path.join(release_file_path, item)
-        destination_path = os.path.join(current_task_path, item)
-
-        if os.path.isfile(source_path):
-            # 如果是文件，进行文件复制
-            try:
-                shutil.copy(source_path, destination_path)
-                print(f"Copied file {source_path} to {destination_path}")
-            except Exception as e:
-                print(f"Error copying file {source_path} to {destination_path}: {e}")
-        elif os.path.isdir(source_path):
-            # 如果是文件夹，进行目录复制
-            try:
-                shutil.copytree(source_path, destination_path, dirs_exist_ok=True)  # Python 3.8+ 支持 dirs_exist_ok 参数
-                print(f"Copied directory {source_path} to {destination_path}")
-            except Exception as e:
-                print(f"Error copying directory {source_path} to {destination_path}: {e}")
-        else:
-            print(f"Skipping {source_path}, it's neither a file nor a directory.")
 
 
 def find_executable_in_directory(directory, filename):
