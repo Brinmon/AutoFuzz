@@ -23,7 +23,6 @@ def get_fuzz_work_dir():
         print(f"Error reading FuzzConfig file: {e}")
         return None
 
-
 def get_projection_version_manager():
     """
     从给定的配置文件中读取 ProjectionVerionManager 的路径。
@@ -51,6 +50,7 @@ def copy_files_to_current_task(release_file_path, current_task_path):
     os.makedirs(current_task_path, exist_ok=True)
 
     # 遍历 ReleaseFilePath 文件夹中的所有文件和文件夹
+    print(release_file_path)
     for item in os.listdir(release_file_path):
         source_path = os.path.join(release_file_path, item)
         destination_path = os.path.join(current_task_path, item)
@@ -77,12 +77,56 @@ def copy_files_to_current_task(release_file_path, current_task_path):
         else:
             print(f"Skipping {source_path}, it's neither a file nor a directory.")
 
-def convert_host_to_docker_path(host_path, bind_mount):
-    # 遍历 bind_mount，找到宿主机路径的映射关系
-    for host_dir, docker_dir in bind_mount.items():
-        if host_path.startswith(host_dir):  # 检查宿主机路径是否在映射路径下
-            # 获取宿主机路径相对于绑定路径的部分，并替换为容器内的路径
-            docker_path = host_path.replace(host_dir, docker_dir, 1)
-            return docker_path
-    # 如果没有找到映射关系，返回原路径
-    return host_path
+def convert_path(host_path, bind_mount, to_docker=True):
+    """
+    将宿主机路径转换为 Docker 路径，或将 Docker 路径转换为宿主机路径。
+    
+    :param host_path: 输入路径
+    :param bind_mount: 绑定挂载的映射字典 {宿主机路径: Docker路径}
+    :param to_docker: 如果为True，表示从宿主机路径转换为Docker路径，False表示反向转换
+    :return: 转换后的路径
+    """
+    if to_docker:  # 从宿主机路径到Docker路径
+        for host_dir, docker_dir in bind_mount.items():
+            if host_path.startswith(host_dir):  # 检查宿主机路径是否在映射路径下
+                # 获取宿主机路径相对于绑定路径的部分，并替换为容器内的路径
+                docker_path = host_path.replace(host_dir, docker_dir, 1)
+                return docker_path
+        return host_path  # 如果没有找到映射关系，返回原路径
+    else:  # 从Docker路径到宿主机路径
+        for host_dir, docker_dir in bind_mount.items():
+            if host_path.startswith(docker_dir):  # 检查容器路径是否在映射路径下
+                # 获取Docker路径相对于绑定路径的部分，并替换为宿主机路径
+                host_path = host_path.replace(docker_dir, host_dir, 1)
+                return host_path
+        return host_path  # 如果没有找到映射关系，返回原路径
+
+def find_executable_in_directory(directory, filename):
+    matching_files = []
+    
+    # 遍历目录下的所有文件和子目录
+    for root, dirs, files in os.walk(directory):
+        if filename in files:
+            full_path = os.path.join(root, filename)
+            # 使用 'file' 命令来检测文件类型
+            try:
+                result = subprocess.run(['file', full_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                if result.returncode == 0:
+                    file_info = result.stdout.decode('utf-8')
+                    if 'executable' in file_info or 'script' in file_info:
+                        matching_files.append(full_path)
+            except Exception as e:
+                print(f"错误：无法执行 'file' 命令，原因: {e}")
+    
+    if len(matching_files) > 1:
+        print(f"警告：在目录 {directory} 中找到了多个可执行文件：")
+        for f in matching_files:
+            print(f)
+    
+    if matching_files:
+        return matching_files[0]
+    else:
+        print(f"未找到可执行文件 {filename}。")
+        return None
+
+

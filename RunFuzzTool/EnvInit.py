@@ -73,31 +73,3 @@ def initialize_pv_manager(fuzz_config_path):
 
 
 
-
-def find_executable_in_directory(directory, filename):
-    matching_files = []
-    
-    # 遍历目录下的所有文件和子目录
-    for root, dirs, files in os.walk(directory):
-        if filename in files:
-            full_path = os.path.join(root, filename)
-            # 使用 'file' 命令来检测文件类型
-            try:
-                result = subprocess.run(['file', full_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                if result.returncode == 0:
-                    file_info = result.stdout.decode('utf-8')
-                    if 'executable' in file_info or 'script' in file_info:
-                        matching_files.append(full_path)
-            except Exception as e:
-                print(f"错误：无法执行 'file' 命令，原因: {e}")
-    
-    if len(matching_files) > 1:
-        print(f"警告：在目录 {directory} 中找到了多个可执行文件：")
-        for f in matching_files:
-            print(f)
-    
-    if matching_files:
-        return matching_files[0]
-    else:
-        print(f"未找到可执行文件 {filename}。")
-        return None

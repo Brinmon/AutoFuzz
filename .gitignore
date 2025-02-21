@@ -1,7 +1,9 @@
 PVManager/
 FuzzWorkDir/
 test.py
-
+InputFile/
+output.tar.gz
+BuildFuzzTool/Work/
 
 
 # Byte-compiled / optimized / DLL files

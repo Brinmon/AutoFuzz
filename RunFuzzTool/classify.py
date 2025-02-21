@@ -36,6 +36,7 @@ def cmin_crashes(Currentcontainer,newbinary_cmd,CurrentTaskPath):
         fuzzresult = ExecuteCmdInDocker(Currentcontainer,f"afl-cmin -i /tmp/out/default/crashes/ -o /tmp/minimized_crashes -- {newbinary_cmd}")
         # print(fuzzresult)
         if fuzzresult["status"] == "error" :
+            print("精简失败重新精简!")
             aflfuzztime = aflfuzztime + 1
             time.sleep(2)
         elif fuzzresult["status"] == "success" :
@@ -50,7 +51,7 @@ def cmin_crashes(Currentcontainer,newbinary_cmd,CurrentTaskPath):
     #删除多余的README.txt文件
     ExecuteCmdInDocker(Currentcontainer,f"rm  /tmp/minimized_crashes/README.txt && chmod -R 777 /tmp/minimized_crashes")
 
-def classify_crashes(Currentcontainer,newbinary_cmd,CurrentTaskPath):
+def classify_crashes(Currentcontainer,newbinary_cmd,CurrentTaskPath,bind_mount):
     # 构建 MasterCrashPath
     MasterCrashPath = Path(os.path.abspath(CurrentTaskPath)).joinpath("out", "default", "crashes")
 
@@ -95,8 +96,8 @@ def classify_crashes(Currentcontainer,newbinary_cmd,CurrentTaskPath):
     os.makedirs(output_analysis_dir, exist_ok=True)
 
     for crash_file in crash_files:
-        CrashFilepath = os.path.join("/tmp/minimized_crashes", crash_file)
-        asan_output = DumpAsanIndo(Currentcontainer,newbinary_cmd,CrashFilepath)
+        DockerCrashFilepath = os.path.join("/tmp/minimized_crashes", crash_file)
+        asan_output = DumpAsanIndo(Currentcontainer,newbinary_cmd,DockerCrashFilepath)
         sanitized_filename = sanitize_filename(f"asan_output_{os.path.basename(crash_file)}.txt")
         asan_output_file = os.path.join(output_analysis_dir, sanitized_filename)
         write_asan_output_to_file(asan_output,asan_output_file)
@@ -104,32 +105,44 @@ def classify_crashes(Currentcontainer,newbinary_cmd,CurrentTaskPath):
         category = classify_crashAsan(asan_output)
         classification_summary[category] += 1
         vulnerability_info = get_vulnerability_info(category)
-        risk_code_display_filedata = extract_and_extract_code(asan_output, CurrentTaskPath)
+        risk_code_display_filedata = extract_and_extract_code(asan_output, str(CurrentTaskPath))
         print("记录漏洞信息...........")
+        MasterCrashPath = convert_path(DockerCrashFilepath, bind_mount, to_docker=False)
+
         # 记录漏洞信息
         bug = {
             "bug_id": f"{category}_{classification_summary[category]:03}",
             "bug_type": category,
-            "crash_file_path": CrashFilepath,
+            "crash_file_path": MasterCrashPath,
             "asan_report_file":asan_output,
             "risk_code_display_file": risk_code_display_filedata,
             "total_discovery_count": 1,
-            "first_discovery_time": time.ctime(os.path.getctime(CrashFilepath)),
+            "first_discovery_time": time.ctime(os.path.getctime(MasterCrashPath)),
             "bug_description": vulnerability_info['bug_description'],
             "risk_level": vulnerability_info['risk_level'],
             "fix_recommendation": vulnerability_info['fix_recommendation']
         }
         bugs_found.append(bug)
-        FuzzStatusDataPath = Path(os.path.abspath(CurrentTaskPath)).joinpath("FuzzStatus.json")
-        fuzzer_statscvg = read_coverage_reached_from_json(FuzzStatusDataPath)
-        # 生成报告
-        report = {
-            "code_path": CurrentTaskPath,
-            "code_coverage": fuzzer_statscvg,
-            "total_bugs_found": len(bugs_found),
-            "fuzzing_task_count": 1,
-            "bugs_found": bugs_found,
-        }
+
+    FuzzStatusDataPath = Path(os.path.abspath(CurrentTaskPath)).joinpath("FuzzStatus.json")
+    fuzzer_statscvg = read_coverage_reached_from_json(FuzzStatusDataPath)
+    # 生成报告
+    report = {
+        "code_path": str(CurrentTaskPath),
+        "code_coverage": fuzzer_statscvg,
+        "total_bugs_found": len(bugs_found),
+        "fuzzing_task_count": 1,
+        "bugs_found": bugs_found,
+    }
+    
+    # 将报告写入JSON文件
+    report_path = Path(CurrentTaskPath).joinpath("report.json")
+    try:
+        with open(report_path, 'w', encoding='utf-8') as f:
+            json.dump(report, f, ensure_ascii=False, indent=4)
+        print(f"成功生成报告文件:{report_path}")
+    except Exception as e:
+        print(f"写入报告文件失败：{str(e)}")
 
 
 def DumpAsanIndo(Currentcontainer,newbinary_cmd,CrashFilepath):
@@ -143,14 +156,14 @@ def DumpAsanIndo(Currentcontainer,newbinary_cmd,CrashFilepath):
     while aflfuzztime <= 9 :
         fuzzresult = ExecuteCmdInDocker(Currentcontainer,f"{replaced_cmd}")
         # print(fuzzresult)
-        if fuzzresult["output"] in "AddressSanitizer" :
+        if  "AddressSanitizer" in fuzzresult["output"] :
             print("成功获得了该crash样本的Asan报告！")
             return fuzzresult["output"]
         else :
             print("输出的Asan报告不合法，重新尝试！")
             print(fuzzresult["output"])
             aflfuzztime = aflfuzztime + 1
-            time.sleep(2)
+            time.sleep(1)
         if aflfuzztime == 9 :
             print("重复获取Asan报告9次失败，返回指定信息！")
             return "达到最大重试次数，ASAN 输出仍为空。需要手动分析!"
@@ -319,6 +332,10 @@ def extract_and_extract_code(log_text, new_directory, context_lines=2):
 
     # 提取 .c 文件路径及其行号
     c_file_paths_with_line_numbers = extract_c_file_paths_with_line_numbers(log_text)
+    
+    if not c_file_paths_with_line_numbers:
+        # 如果为空，返回提示信息
+        return "未找到源码定位信息，请手动进行源码定位。"
 
     # 替换路径并提取源码
     results = []
@@ -351,3 +368,40 @@ def read_coverage_reached_from_json(file_path):
     except json.JSONDecodeError:
         print("文件不是有效的 JSON 格式。")
         return None
+    
+
+def analyze_fuzz_results(FuzzTaskInfo,CurrentTaskPath):
+    """
+    汇总分析fuzz结果的功能，包括以下步骤：
+    1. 检测版本信息，判断是否需要重新编译还是直接使用现有编译好的文件。
+    2. 创建存放项目文件的文件夹。
+    3. 根据检测结果，解压目标数据或复制已编译好的文件。
+    4. 创建 Docker 客户端并启动容器。
+    5. 查找目标可执行文件并转换路径。
+    6. 分类整理 Crash 样本文件。
+    """
+
+    FuzzTaskName = FuzzTaskInfo["program_name"]
+    ProjectID = "analyze_fuzz_results"
+    binary_cmd = FuzzTaskInfo["bin_cmd"]
+
+    # 创建 Docker 客户端
+    Mainclient = docker.from_env()
+    bind_mount = {f'{CurrentTaskPath}': '/tmp'}
+    dockername = f"{FuzzTaskName}_{ProjectID}"  # 避免测试同一个项目时发生冲突
+    Currentcontainer = CreateAFLDocker(Mainclient, dockername, bind_mount, use_existing=True)
+
+    # 查找目标可执行文件并转换路径
+    targetbinname = binary_cmd.split()[0]
+    hosttargetbinpath = find_executable_in_directory(CurrentTaskPath, targetbinname)
+    dokcertargetbinpath = convert_path(hosttargetbinpath, bind_mount,to_docker=True)
+    newbinary_cmd = f"{dokcertargetbinpath} {binary_cmd[len(targetbinname):]}"
+
+    # 开始最后的整理Crash样本文件
+    classify_crashes(Currentcontainer, newbinary_cmd, CurrentTaskPath,bind_mount)
+
+    #结束docker容器的运行
+    if Currentcontainer:
+        check_and_stop_container(Mainclient,Currentcontainer.id)  # 使用容器的 ID
+
+

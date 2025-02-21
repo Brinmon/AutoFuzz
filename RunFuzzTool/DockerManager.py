@@ -178,9 +178,9 @@ def ExecuteCmdInDocker(container, command):
     exit_code_current, output_current = container.exec_run(exec_command, detach=False, stdout=True, stderr=True)
 
     if exit_code_current == 0:
-        return {"status": "success", "output": output_current.decode("utf-8")}
+        return {"status": "success", "output": output_current.decode("utf-8",errors="replace")}
     else:
-        return {"status": "error", "output": output_current.decode("utf-8"), "exit_code": exit_code_current}
+        return {"status": "error", "output": output_current.decode("utf-8",errors="replace"), "exit_code": exit_code_current}
 
 def parse_summary_stats(text):
     """解析命令输出中的 Summary stats 并返回 JSON 格式"""
