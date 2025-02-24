@@ -1,0 +1,17 @@
+{
+    "program_name": "fuzzgoat_1",
+    "url": "",
+    "source_code_path": "/home/aifuzz/liyong/open_fuzz/ExampleFile/fuzzgoat_task.zip",
+    "afl_fuzz_args": {
+        "task_id": 1,
+        "Default_compiler": {
+            "default": "llvm-clang",
+            "compile_setting": "cmake"
+        },
+        "fuzzer": "AFL++",
+        "fuzz_time": "60",
+        "fuzz_target": "fuzzgoat @@",
+        "CC_module": "",
+        "CXX_module": ""
+    }
+}
