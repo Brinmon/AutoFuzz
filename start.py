@@ -50,13 +50,6 @@ def AutoFuzzMain(config_path):
     docker_mgr.stop_docker()
     
 
-    
-
-
-
-
-
-    
 
 def analyze_fuzz_results(FuzzTaskInfo):
     pass

@@ -1,10 +1,17 @@
 {
-    "project_id":"1",                       
-    "program_name": "FuzzGoat_v1.0",                
-    "UpladFile": "/home/aifuzz/liyong/AutoFuzz/InputFile/tarfile/fuzzgoat_task.zip", 
-    "Urls":"https://github.com/fuzzstati0n/fuzzgoat.git",       
-    "version":"fuzzgoat_1.0",
-    "fuzz_time": "70",              
-    "parallel": 1  ,    
-    "bin_cmd": "fuzzgoat @@"
+    "program_name": "LibTIFF_task",
+    "url": "",
+    "source_code_path": "/home/aifuzz/liyong/AutoFuzz/InputFile/tarfile/LibTIFF_task.zip",
+    "afl_fuzz_args": {
+        "task_id": 1,
+        "Default_compiler": {
+            "default": "llvm-clang",
+            "compile_setting": "cmake"
+        },
+        "fuzzer": "AFL++",
+        "fuzz_time": "60",
+        "fuzz_target": "fuzzgoat @@",
+        "CC_module": "",
+        "CXX_module": ""
+    }
 }

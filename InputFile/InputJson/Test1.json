@@ -1,10 +1,17 @@
 {
-    "project_id":"8",                       
-    "program_name": "LibTIFF_v4.0.4",                
-    "UpladFile": "", 
-    "Urls":"https://download.osgeo.org/libtiff/tiff-4.0.4.tar.gz",       
-    "version":"libtiff_4.0.4",
-    "fuzz_time": "40",              
-    "parallel": 1  ,    
-    "bin_cmd": "tiffinfo -D -j -c -r -s -w @@"
+    "program_name": "Xpdf_task",
+    "url": "",
+    "source_code_path": "/home/aifuzz/liyong/AutoFuzz/InputFile/tarfile/Xpdf_task.zip",
+    "afl_fuzz_args": {
+        "task_id": 1,
+        "Default_compiler": {
+            "default": "llvm-clang",
+            "compile_setting": "cmake"
+        },
+        "fuzzer": "AFL++",
+        "fuzz_time": "60",
+        "fuzz_target": "fuzzgoat @@",
+        "CC_module": "",
+        "CXX_module": ""
+    }
 }

@@ -1,5 +1,5 @@
 {
-    "program_name": "fuzzgoat_1",
+    "program_name": "fuzzgoat_task",
     "url": "",
     "source_code_path": "/home/aifuzz/liyong/open_fuzz/ExampleFile/fuzzgoat_task.zip",
     "afl_fuzz_args": {
